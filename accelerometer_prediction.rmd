@@ -1,0 +1,71 @@
+Prediction from Accelerometers Data
+===================================
+## Executive Summary
+The goal of the exercise is to predict the manner of exercise given the accelerometer data. The outcome of the prediction is one of the five ways of lifting the barbel. To build the model, LDA and Random Forests are evaluated using Accuracy metric and cross validation.
+## Details
+The data used for this purpose is available under https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv. Library caret is used for the purpose of model building.
+```{r}
+  library(caret)
+```
+First, the data is downloaded and copied to the data folder of the current working directory. 
+
+Then, it is loaded using read.csv.
+```{r}
+  data <- read.csv("data/pml-training.csv")
+  summary(data)
+```
+As can be seen from the summary, only some columns can be used for prediction. Some columns like started by kurtosis and avg suggest that those columns are derived features and will not be used as predictors. Furthermore, those features have many NAs or invalid values such as #Div/0!.
+
+This ends up with the following columns:
+```{r}
+  sub <- data[,c(8:11, 37:49, 60:68, 84:86,113:124, 151:160)]
+```
+where 160 is the 'classe' column. 
+
+50 features obtained from the operation above are used to predict the classe. Three classification methods are compared to select the best method:
+
+- linear discriminant analysis (lda)
+- boosting (gbm)
+- random forest (rf)
+
+For each method, cross validation is used to determine the method parameters. In order to make sure that all methods use the same cross validation sets, the call to train methods use the same training option and the same seed.
+
+```{r}
+# make sure all trainings to use the same trainControl
+fitControl <- trainControl(## 20-fold CV
+                           method = "cv",
+                           number = 20)
+set.seed(820)
+ldaFit <- train(classe ~ ., data = sub, method = "lda", 
+                trControl=fitControl)
+ldaFit
+
+set.seed(820)
+gbmFit <- train(classe ~ ., data = sub, method = "gbm", 
+                trControl=fitControl)
+gbmFit
+set.seed(820)
+rfFit <- train(classe ~ ., data = sub, method = "rf", 
+                trControl=fitControl)
+rfFit
+```
+Once trained, the models are compared using resampling. This is done using resamples function of caret.
+
+
+```{r}
+resamps <- resamples(list(LDA = ldaFit,
+                          GBM = gbmFit,
+                          RF  = rfFit))
+trellis.par.set(theme1)
+bwplot(resamps, layout = c(3, 1))
+
+summary(resamps)
+```
+As we can see, the random forests model  is in general better than the other two. Therefore the model is used for the prediction purpose.
+
+The prediction can be done then as follow:
+```{r}
+ testing <- read.csv("data/pml-testing.csv")
+ resp    <- predict(rfFit, newdata=testing)
+resp
+```
